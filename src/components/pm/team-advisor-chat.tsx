@@ -71,10 +71,12 @@ export function TeamAdvisorChat({ project, currentTeamSkills }: TeamAdvisorChatP
         text: data?.text ?? "Something went wrong. Try again.",
       };
       setMessages((prev) => [...prev, aiMsg]);
-    } catch {
+    } catch (err: any) {
+      console.error("Advisor chat error:", err);
+      const errMsg = err?.message || err?.toString() || "Unknown error";
       setMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: "model", text: "⚠️ Failed to reach AI. Please try again." },
+        { id: crypto.randomUUID(), role: "model", text: `⚠️ Error: ${errMsg}` },
       ]);
     } finally {
       setLoading(false);
