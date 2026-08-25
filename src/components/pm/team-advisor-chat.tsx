@@ -63,7 +63,24 @@ export function TeamAdvisorChat({ project, currentTeamSkills }: TeamAdvisorChatP
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        let detailedMsg = error.message;
+        try {
+          // FunctionsHttpError contains the response context
+          if (error && 'context' in error) {
+            const context = (error as any).context;
+            if (context && typeof context.json === 'function') {
+              const errBody = await context.json();
+              if (errBody && errBody.error) {
+                detailedMsg = errBody.error;
+              }
+            } else if (context && typeof context.text === 'function') {
+              detailedMsg = await context.text();
+            }
+          }
+        } catch (_) {}
+        throw new Error(detailedMsg);
+      }
 
       const aiMsg: Message = {
         id: crypto.randomUUID(),
