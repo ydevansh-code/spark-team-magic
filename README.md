@@ -1,44 +1,52 @@
-# Project Spark
+# 🚀 ProjectMatch — AI Team Formation Platform
 
-i am building this project match i have inserted the images one of landing page and one of second page that will come inside landing page which will have all the features and all , make sure to recreate the images in the frontend webpage thats like your blueprint , but some features are missing from them i forgot to edit image so i will list them too so add them also so its easier for me to make backend , What's MISSING ❌ (~30%)
+ProjectMatch is an intelligent team-formation platform that calculates complementary skill scores and auto-assembles balanced project teams using Generative AI. 
 
-Profile editing modal — No spec for how users refine extracted skills
+Built during the **4.5-hour Prompt Wars Hackathon** (organized by FAST SRM, NVIDIA, and Hack2Skill), this MVP solves the problem of inefficient team building by matching users based on skill gaps, needed roles, and learning interests rather than just immediate social circles.
 
-Current team display — Users can't see who they've added
+---
 
-Project creation modal — Missing the form/flow entirely
+## ✨ Key Features
 
-Team member status — No "✓ On Team" indicator spec
+* **🤖 Magic Assemble (AI Matching):** Uses a server-side Gemini 2.5 Flash model to evaluate candidates and project requirements, outputting a 0-100 compatibility score with reasoned insights.
+* **🔒 Secure Edge Architecture:** AI scoring logic and API keys are completely protected within a Supabase Edge Function, ensuring zero client-side vulnerability.
+* **🔐 Multi-Provider Authentication:** Secure login via Email/Password and Google OAuth, backed by a custom `user_login_logs` audit table for session tracking.
+* **👨‍💻 Dynamic Profiles:** User cards feature interactive skill tags, availability statuses, and direct external routing to GitHub and LinkedIn profiles.
+* **🎨 Glassmorphism UI:** A highly polished, responsive dark-mode interface built with Tailwind CSS, Shadcn UI, and Framer Motion.
 
-All error states — No patterns for API failures
+---
 
-Loading state patterns — Vague mention, no details
+## 🛠️ Tech Stack
 
-Accessibility specifics — Listed as requirement, not detailed
+**Frontend (Client)**
+* React.js + Vite
+* Tailwind CSS
+* Shadcn UI (Component Primitives)
+* Framer Motion (Micro-interactions)
 
-Mock data schemas — No TypeScript interfaces provided
+**Backend (BaaS)**
+* Supabase (PostgreSQL Database & Auth)
+* Row Level Security (RLS) for data privacy
 
-Service layer — No API abstraction blueprint
+**AI & Edge Compute**
+* Supabase Edge Functions (Deno / TypeScript)
+* Google Gemini API (`gemini-2.5-flash`)
 
-Confirmation dialogs — No undo/prevent-accidents flow okay so please make it , please push everything and make sure your credits donot expire and u complete it before it happening
+---
 
-This project was built with [Lovable](https://lovable.dev).
+## 🏗️ System Architecture
 
-## Build with Lovable
+1. **Client Layer:** User requests an AI match via the frontend dashboard.
+2. **Auth Layer:** Supabase verifies the active session and logs the user agent/IP.
+3. **Edge Layer:** The client securely invokes the `match-score` Supabase Edge Function.
+4. **AI Layer:** The Edge Function constructs a specialized prompt using the project needs and candidate profile, queries the Gemini API, and returns a verified JSON payload.
+5. **Database Layer:** Approved matches are persisted in the `team_members` relational table.
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/1a9b562c-2e5d-428a-8904-93a7283d701a).
+---
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+## 🏁 Local Setup & Installation
 
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+**1. Clone the repository:**
+```bash
+git clone [https://github.com/ydevansh-code/spark-team-magic.git](https://github.com/ydevansh-code/spark-team-magic.git)
+cd spark-team-magic
