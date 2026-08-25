@@ -1,4 +1,4 @@
-import { Check, Loader2, Plus } from "lucide-react";
+import { Check, Github, Linkedin, Loader2, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -37,6 +37,16 @@ export function MatchCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-bold">{candidate.displayName}</h3>
+            {candidate.githubUrl && (
+              <a href={candidate.githubUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
+                <Github className="size-4" />
+              </a>
+            )}
+            {candidate.linkedinUrl && (
+              <a href={candidate.linkedinUrl} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground">
+                <Linkedin className="size-4" />
+              </a>
+            )}
             {onTeam ? (
               <Badge className="gap-1 bg-primary text-primary-foreground">
                 <Check className="size-3" aria-hidden="true" />

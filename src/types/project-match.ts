@@ -23,6 +23,8 @@ export interface UserProfile {
   wantsToLearn: string[];
   availability: "casual" | "part-time" | "full-time";
   timezone: string;
+  githubUrl?: string;
+  linkedinUrl?: string;
 }
 
 export type ProjectRole = string;
@@ -59,6 +61,8 @@ export interface Candidate {
   gapFilled?: string;
   /** 0-100 overlap with the current team */
   overlap: number;
+  githubUrl?: string;
+  linkedinUrl?: string;
 }
 
 export interface TeamMember {

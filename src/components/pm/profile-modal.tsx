@@ -120,6 +120,27 @@ export function ProfileEditModal({
             </p>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="pm-github">GitHub Profile (optional)</Label>
+              <Input
+                id="pm-github"
+                placeholder="https://github.com/..."
+                value={draft.githubUrl ?? ""}
+                onChange={(e) => setDraft({ ...draft, githubUrl: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="pm-linkedin">LinkedIn Profile (optional)</Label>
+              <Input
+                id="pm-linkedin"
+                placeholder="https://linkedin.com/in/..."
+                value={draft.linkedinUrl ?? ""}
+                onChange={(e) => setDraft({ ...draft, linkedinUrl: e.target.value })}
+              />
+            </div>
+          </div>
+
           <div className="space-y-3">
             <Label>Extracted skills</Label>
             <ul className="space-y-2">

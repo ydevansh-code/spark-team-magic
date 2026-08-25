@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowDown, Loader2, Pencil, Plus, Search, Sparkles } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/workspace")({
 
 function Workspace() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
@@ -50,9 +52,26 @@ function Workspace() {
   const [showAll, setShowAll] = useState(false);
   const [confirm, setConfirm] = useState<null | { kind: "remove"; candidate: Candidate }>(null);
   const [reassembleOpen, setReassembleOpen] = useState(false);
+  const [hasPromptedProfile, setHasPromptedProfile] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) navigate({ to: "/login" });
+    });
+  }, [navigate]);
 
   const projectsQ = useQuery({ queryKey: ["projects"], queryFn: projectService.list });
   const profileQ = useQuery({ queryKey: ["profile"], queryFn: profileService.get });
+
+  // Prompt users to fill out their profile if it's empty on first load
+  useEffect(() => {
+    if (profileQ.data && !hasPromptedProfile) {
+      setHasPromptedProfile(true);
+      if (profileQ.data.skills.length === 0 && profileQ.data.wantsToLearn.length === 0) {
+        setProfileOpen(true);
+      }
+    }
+  }, [profileQ.data, hasPromptedProfile]);
 
   const projects = projectsQ.data ?? [];
   const projectId = activeId ?? projects[0]?.id ?? null;

@@ -135,7 +135,7 @@ export function CreateProjectModal({
               max={8}
               step={1}
               value={[size]}
-              onValueChange={([v]) => setSize(v)}
+              onValueChange={([v]) => { if (v !== undefined) setSize(v); }}
             />
           </div>
         </div>
