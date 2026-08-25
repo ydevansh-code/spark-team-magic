@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowDown, Loader2, Pencil, Plus, Search, Sparkles } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { useCallback, useMemo, useState, useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,11 +54,10 @@ function Workspace() {
   const [reassembleOpen, setReassembleOpen] = useState(false);
   const [hasPromptedProfile, setHasPromptedProfile] = useState(false);
 
+  const { loading: authLoading, session } = useAuth();
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) navigate({ to: "/login" });
-    });
-  }, [navigate]);
+    if (!authLoading && !session) navigate({ to: "/login" });
+  }, [authLoading, session, navigate]);
 
   const projectsQ = useQuery({ queryKey: ["projects"], queryFn: projectService.list });
   const profileQ = useQuery({ queryKey: ["profile"], queryFn: profileService.get });
@@ -93,10 +92,10 @@ function Workspace() {
     [teamQ.data],
   );
 
-  function invalidateTeam() {
+  const invalidateTeam = useCallback(() => {
     qc.invalidateQueries({ queryKey: ["team", projectId] });
     qc.invalidateQueries({ queryKey: ["matches", projectId] });
-  }
+  }, [qc, projectId]);
 
   const addM = useMutation({
     mutationFn: (candidateId: string) => teamService.add(projectId!, candidateId),
@@ -323,7 +322,7 @@ function Workspace() {
                   <EmptyState>No matches yet — add more detail to your project.</EmptyState>
                 ) : (
                   <>
-                    <ul className="space-y-3">
+                    <ul className="space-y-3" aria-label="Candidate matches">
                       {visibleMatches.map((candidate) => (
                         <MatchCard
                           key={candidate.id}
@@ -340,9 +339,9 @@ function Workspace() {
                     </ul>
                     {matches.length > 5 ? (
                       <div className="text-center">
-                        <Button variant="ghost" size="sm" onClick={() => setShowAll((v) => !v)}>
-                          <ArrowDown className="size-3.5" aria-hidden="true" />
-                          {showAll ? "Fewer matches" : "More matches"}
+                        <Button variant="ghost" size="sm" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)}>
+                          <ArrowDown className={`size-3.5 transition-transform ${showAll ? "rotate-180" : ""}`} aria-hidden="true" />
+                          {showAll ? "Fewer matches" : `Show all ${matches.length} matches`}
                         </Button>
                       </div>
                     ) : null}

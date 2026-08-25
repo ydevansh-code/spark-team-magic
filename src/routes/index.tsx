@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, MessageSquare, Puzzle, Sparkles, Wand2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -40,35 +41,69 @@ const FEATURES = [
   },
 ];
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
+};
+
 function Landing() {
   return (
-    <div className="min-h-dvh bg-background p-3 sm:p-6">
-      <main className="frame-mint mx-auto max-w-5xl px-6 py-14 sm:px-10 sm:py-20">
-        <div className="text-center">
-          <Sparkles className="mx-auto size-5 text-mint" aria-hidden="true" />
-          <p className="mt-3 text-lg font-bold tracking-tight">ProjectMatch</p>
+    <div className="min-h-dvh bg-background p-3 sm:p-6 relative overflow-hidden">
+      {/* Ambient background mesh gradient simulation */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-mint/10 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[120px] pointer-events-none" />
 
-          <h1 className="mx-auto mt-6 max-w-3xl text-3xl leading-tight font-extrabold sm:text-[2.6rem]">
+      <motion.main 
+        initial="hidden"
+        animate="visible"
+        variants={containerVariants}
+        className="frame-mint mx-auto max-w-5xl px-6 py-14 sm:px-10 sm:py-20 relative z-10 bg-background/40 backdrop-blur-3xl"
+      >
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: [0, 15, -15, 0] }}
+            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+            className="inline-block"
+          >
+            <Sparkles className="mx-auto size-5 text-mint" aria-hidden="true" />
+          </motion.div>
+          <motion.p variants={itemVariants} className="mt-3 text-lg font-bold tracking-tight">ProjectMatch</motion.p>
+
+          <motion.h1 variants={itemVariants} className="mx-auto mt-6 max-w-3xl text-3xl leading-tight font-extrabold sm:text-[2.6rem] bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
             Teams Don't Need More People Who Look Like You.
             <br className="hidden sm:block" /> They Need People Who Complete You.
-          </h1>
+          </motion.h1>
 
-          <p className="mt-5 text-base font-semibold text-mint sm:text-lg">
+          <motion.p variants={itemVariants} className="mt-5 text-base font-semibold text-mint sm:text-lg">
             AI-powered matching for hackathons, competitions, and startups.
-          </p>
-          <p className="mt-2 text-xs text-muted-foreground">
+          </motion.p>
+          <motion.p variants={itemVariants} className="mt-2 text-xs text-muted-foreground">
             Find teammates with complementary skills, not similar ones.
-          </p>
+          </motion.p>
         </div>
 
-        <ul className="mt-12 grid gap-4 sm:grid-cols-3 sm:items-center">
+        <motion.ul variants={containerVariants} className="mt-12 grid gap-4 sm:grid-cols-3 sm:items-center">
           {FEATURES.map(({ icon: Icon, title, body, featured }) => (
-            <li
+            <motion.li
+              variants={itemVariants}
+              whileHover={{ y: -5, scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
               key={title}
               className={
                 featured
-                  ? "ring-mint rounded-xl bg-surface-2 p-5 sm:-my-4 sm:py-8"
-                  : "rounded-xl border border-border bg-surface/40 p-5"
+                  ? "ring-mint rounded-xl bg-surface-2 p-5 sm:-my-4 sm:py-8 shadow-xl shadow-mint/5"
+                  : "rounded-xl border border-border bg-surface/40 p-5 hover:bg-surface/60 transition-colors"
               }
             >
               <span className="grid size-9 place-items-center rounded-lg bg-primary/15">
@@ -76,14 +111,14 @@ function Landing() {
               </span>
               <h2 className="mt-4 text-sm font-bold">{title}</h2>
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{body}</p>
-            </li>
+            </motion.li>
           ))}
-        </ul>
+        </motion.ul>
 
-        <div className="mt-12 text-center">
+        <motion.div variants={itemVariants} className="mt-12 text-center">
           <Link
             to="/workspace"
-            className="glow-mint inline-flex min-h-12 items-center gap-2 rounded-full bg-primary px-7 text-sm font-bold text-primary-foreground transition-transform hover:scale-[1.02]"
+            className="glow-mint inline-flex min-h-12 items-center gap-2 rounded-full bg-primary px-7 text-sm font-bold text-primary-foreground transition-all hover:scale-[1.05] hover:shadow-[0_0_20px_rgba(45,212,191,0.4)]"
           >
             Find Your Team
             <ArrowRight className="size-4" aria-hidden="true" />
@@ -91,8 +126,8 @@ function Landing() {
           <p className="mt-3 text-[11px] text-muted-foreground">
             No signup required — Try now
           </p>
-        </div>
-      </main>
+        </motion.div>
+      </motion.main>
     </div>
   );
 }

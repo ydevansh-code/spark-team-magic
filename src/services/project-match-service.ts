@@ -1,15 +1,27 @@
 import { supabase } from "@/lib/supabase";
+import type { Database } from "@/lib/supabase";
 import type {
   AssembleResult,
   Candidate,
   Project,
   ServiceError,
+  Skill,
   TeamMember,
   UserProfile,
 } from "@/types/project-match";
 
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type SkillRow = Database["public"]["Tables"]["skills"]["Row"];
+type ProjectRow = Database["public"]["Tables"]["projects"]["Row"];
+type TeamMemberRow = Database["public"]["Tables"]["team_members"]["Row"];
+
 export function isServiceError(value: unknown): value is ServiceError {
-  return typeof value === "object" && value !== null && "code" in value && "retryable" in value;
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "code" in value &&
+    "retryable" in value
+  );
 }
 
 export function errorMessage(error: unknown): string {
@@ -18,8 +30,69 @@ export function errorMessage(error: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
-function toServiceError(e: unknown, code: ServiceError["code"] = "server"): ServiceError {
-  return { code, message: errorMessage(e), retryable: code !== "validation" && code !== "not_found" };
+function toServiceError(
+  e: unknown,
+  code: ServiceError["code"] = "server"
+): ServiceError {
+  return {
+    code,
+    message: errorMessage(e),
+    retryable: code !== "validation" && code !== "not_found",
+  };
+}
+
+function mapSkills(skills: SkillRow[]): { known: Skill[]; wantsToLearn: string[] } {
+  return {
+    known: skills
+      .filter((s) => s.category === "known")
+      .map((s) => ({ id: s.id, name: s.skill_name, level: "intermediate" as const })),
+    wantsToLearn: skills
+      .filter((s) => s.category === "wants_to_learn")
+      .map((s) => s.skill_name),
+  };
+}
+
+function mapProject(p: ProjectRow): Project {
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.description ?? "",
+    neededRoles: p.needed_roles ?? [],
+    teamSizeTarget: p.team_size_target ?? 4,
+    createdAt: p.created_at,
+    memberIds: [],
+  };
+}
+
+function mapCandidate(
+  p: ProfileRow & { skills: SkillRow[] },
+  project: Project,
+  teamIds: Set<string>
+): Candidate & { onTeam: boolean } {
+  const { known, wantsToLearn } = mapSkills(p.skills);
+  const filledRoles = project.neededRoles.filter((role) =>
+    known.some((s) => s.name.toLowerCase().includes(role.toLowerCase()))
+  );
+  const score = Math.min(100, filledRoles.length * 40 + (wantsToLearn.length > 0 ? 20 : 0));
+
+  return {
+    id: p.id,
+    initials: p.display_name?.slice(0, 2).toUpperCase() ?? "??",
+    displayName: p.display_name ?? "Unknown",
+    headline: p.bio ?? "",
+    skills: known,
+    matchScore: score,
+    reasons: filledRoles.length > 0 ? ["Complementary"] : ["Mutual Interest"],
+    explanation:
+      filledRoles.length > 0
+        ? `Fills your ${filledRoles[0]} gap.`
+        : "Shares interests with your team.",
+    ...(filledRoles[0] ? { gapFilled: filledRoles[0] } : {}),
+    overlap: 0,
+    onTeam: teamIds.has(p.id),
+    githubUrl: p.github_url ?? undefined,
+    linkedinUrl: p.linkedin_url ?? undefined,
+  };
 }
 
 /* ---------------------------------- auth audit ---------------------------------- */
@@ -46,7 +119,9 @@ export const authAuditService = {
 
 export const profileService = {
   async get(): Promise<UserProfile> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) throw toServiceError(new Error("Not authenticated"), "server");
 
     const { data: profile, error: pe } = await supabase
@@ -62,29 +137,32 @@ export const profileService = {
       .eq("profile_id", user.id);
     if (se) throw toServiceError(se, "server");
 
+    const { known, wantsToLearn } = mapSkills(skills ?? []);
+
     return {
       id: profile.id,
-      displayName: profile.display_name,
+      displayName: profile.display_name ?? user.email ?? "User",
       rawDescription: profile.bio ?? "",
       availability: (profile.availability ?? "part-time") as UserProfile["availability"],
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       githubUrl: profile.github_url ?? undefined,
       linkedinUrl: profile.linkedin_url ?? undefined,
-      skills: (skills ?? [])
-        .filter((s) => s.category === "known")
-        .map((s) => ({ id: s.id, name: s.skill_name, level: "intermediate" as const })),
-      wantsToLearn: (skills ?? [])
-        .filter((s) => s.category === "wants_to_learn")
-        .map((s) => s.skill_name),
+      skills: known,
+      wantsToLearn,
     };
   },
 
   async update(patch: Partial<UserProfile>): Promise<UserProfile> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) throw toServiceError(new Error("Not authenticated"), "server");
 
     if (patch.displayName !== undefined && patch.displayName.trim().length < 2) {
-      throw toServiceError(new Error("Display name needs at least 2 characters."), "validation");
+      throw toServiceError(
+        new Error("Display name needs at least 2 characters."),
+        "validation"
+      );
     }
 
     const { error: pe } = await supabase
@@ -105,16 +183,17 @@ export const profileService = {
       const known = (patch.skills ?? []).map((s) => ({
         profile_id: user.id,
         skill_name: s.name,
-        category: "known",
+        category: "known" as const,
       }));
       const learn = (patch.wantsToLearn ?? []).map((name) => ({
         profile_id: user.id,
         skill_name: name,
-        category: "wants_to_learn",
+        category: "wants_to_learn" as const,
       }));
 
-      if (known.length + learn.length > 0) {
-        const { error: se } = await supabase.from("skills").insert([...known, ...learn]);
+      const rows = [...known, ...learn];
+      if (rows.length > 0) {
+        const { error: se } = await supabase.from("skills").insert(rows);
         if (se) throw toServiceError(se);
       }
     }
@@ -134,7 +213,9 @@ export interface CreateProjectInput {
 
 export const projectService = {
   async list(): Promise<Project[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return [];
 
     const { data, error } = await supabase
@@ -144,15 +225,7 @@ export const projectService = {
       .order("created_at", { ascending: false });
     if (error) throw toServiceError(error);
 
-    return (data ?? []).map((p) => ({
-      id: p.id,
-      title: p.title,
-      description: p.description ?? "",
-      neededRoles: p.needed_roles ?? [],
-      teamSizeTarget: 4,
-      createdAt: p.created_at,
-      memberIds: [],
-    }));
+    return (data ?? []).map(mapProject);
   },
 
   async get(id: string): Promise<Project> {
@@ -162,25 +235,22 @@ export const projectService = {
       .eq("id", id)
       .single();
     if (error) throw toServiceError(error, "not_found");
-
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description ?? "",
-      neededRoles: data.needed_roles ?? [],
-      teamSizeTarget: 4,
-      createdAt: data.created_at,
-      memberIds: [],
-    };
+    return mapProject(data);
   },
 
   async create(input: CreateProjectInput): Promise<Project> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) throw toServiceError(new Error("Not authenticated"), "server");
 
-    if (!input.title.trim()) throw toServiceError(new Error("Give your project a title."), "validation");
+    if (!input.title.trim())
+      throw toServiceError(new Error("Give your project a title."), "validation");
     if (input.neededRoles.length === 0) {
-      throw toServiceError(new Error("Pick at least one role you're looking for."), "validation");
+      throw toServiceError(
+        new Error("Pick at least one role you're looking for."),
+        "validation"
+      );
     }
 
     const { data, error } = await supabase
@@ -190,20 +260,13 @@ export const projectService = {
         title: input.title.trim(),
         description: input.description.trim(),
         needed_roles: input.neededRoles,
+        team_size_target: input.teamSizeTarget,
       })
       .select()
       .single();
     if (error) throw toServiceError(error);
 
-    return {
-      id: data.id,
-      title: data.title,
-      description: data.description ?? "",
-      neededRoles: data.needed_roles ?? [],
-      teamSizeTarget: input.teamSizeTarget,
-      createdAt: data.created_at,
-      memberIds: [],
-    };
+    return mapProject(data);
   },
 
   async remove(id: string): Promise<{ id: string }> {
@@ -217,7 +280,9 @@ export const projectService = {
 
 export const matchService = {
   async listCandidates(projectId: string): Promise<(Candidate & { onTeam: boolean })[]> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return [];
 
     const { data: teamRows } = await supabase
@@ -234,39 +299,15 @@ export const matchService = {
 
     const project = await projectService.get(projectId);
 
-    return (profiles ?? []).map((p) => {
-      const knownSkills = (p.skills ?? []).filter((s: any) => s.category === "known");
-      const wantsToLearn = (p.skills ?? [])
-        .filter((s: any) => s.category === "wants_to_learn")
-        .map((s: any) => s.skill_name);
-
-      const filledRoles = project.neededRoles.filter((role) =>
-        knownSkills.some((s: any) => s.skill_name.toLowerCase().includes(role.toLowerCase()))
-      );
-      const score = Math.min(100, filledRoles.length * 40 + (wantsToLearn.length > 0 ? 20 : 0));
-
-      return {
-        id: p.id,
-        initials: p.display_name?.slice(0, 2).toUpperCase() ?? "??",
-        displayName: p.display_name,
-        headline: p.bio ?? "",
-        skills: knownSkills.map((s: any) => ({ id: s.id, name: s.skill_name, level: "intermediate" as const })),
-        matchScore: score,
-        reasons: filledRoles.length > 0 ? ["Complementary"] : ["Mutual Interest"],
-        explanation: filledRoles.length > 0
-          ? `Fills your ${filledRoles[0]} gap.`
-          : "Shares interests with your team.",
-        ...(filledRoles[0] ? { gapFilled: filledRoles[0] } : {}),
-        overlap: 0,
-        onTeam: teamIds.has(p.id),
-        githubUrl: p.github_url ?? undefined,
-        linkedinUrl: p.linkedin_url ?? undefined,
-      };
-    });
+    return (profiles ?? []).map((p) =>
+      mapCandidate(p as ProfileRow & { skills: SkillRow[] }, project, teamIds)
+    );
   },
 
   async magicAssemble(projectId: string): Promise<AssembleResult> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) throw toServiceError(new Error("Not authenticated"), "server");
 
     const { data: existingTeamRows } = await supabase
@@ -274,7 +315,9 @@ export const matchService = {
       .select("*, profiles(*, skills(*))")
       .eq("project_id", projectId);
 
-    const existingTeam = (existingTeamRows ?? []).map((r: any) => r.profiles);
+    const existingTeam = (existingTeamRows ?? []).map(
+      (r: TeamMemberRow & { profiles: ProfileRow & { skills: SkillRow[] } }) => r.profiles
+    );
 
     const candidates = await matchService.listCandidates(projectId);
     const unassigned = candidates.filter((c) => !c.onTeam);
@@ -285,12 +328,14 @@ export const matchService = {
 
     const project = await projectService.get(projectId);
 
-    const { data: scored, error } = await supabase.functions.invoke("match-score", {
+    const { data: scored, error } = await supabase.functions.invoke<
+      { candidateId: string; score: number; reasons: string[] }[]
+    >("match-score", {
       body: { project, candidates: unassigned, existingTeam },
     });
     if (error) throw toServiceError(error);
 
-    const top3 = (scored as { candidateId: string; score: number; reasons: string[] }[])
+    const top3 = (scored ?? [])
       .sort((a, b) => b.score - a.score)
       .slice(0, 3);
 
@@ -299,7 +344,8 @@ export const matchService = {
     const inserts = top3.map((tc) => ({
       project_id: projectId,
       candidate_id: tc.candidateId,
-      role: unassigned.find((c) => c.id === tc.candidateId)?.skills?.[0]?.name ?? "Contributor",
+      role:
+        unassigned.find((c) => c.id === tc.candidateId)?.skills?.[0]?.name ?? "Contributor",
     }));
 
     const { error: ie } = await supabase
@@ -310,12 +356,12 @@ export const matchService = {
     const members: TeamMember[] = top3.map((tc) => ({
       candidateId: tc.candidateId,
       addedAt: new Date().toISOString(),
-      status: "on-team",
+      status: "on-team" as const,
     }));
 
     return {
       members,
-      summary: `Team assembled: Top ${members.length} matches added by Gemini`,
+      summary: `Team assembled: Top ${members.length} matches added by AI`,
     };
   },
 };
@@ -330,9 +376,9 @@ export const teamService = {
       .eq("project_id", projectId);
     if (error) throw toServiceError(error);
 
-    return (data ?? []).map((row: any) => {
-      const p = row.profiles;
-      const knownSkills = (p.skills ?? []).filter((s: any) => s.category === "known");
+    return (data ?? []).map((row) => {
+      const p = row.profiles as ProfileRow & { skills: SkillRow[] };
+      const { known } = mapSkills(p.skills ?? []);
       return {
         member: {
           candidateId: row.candidate_id,
@@ -342,9 +388,9 @@ export const teamService = {
         candidate: {
           id: p.id,
           initials: p.display_name?.slice(0, 2).toUpperCase() ?? "??",
-          displayName: p.display_name,
+          displayName: p.display_name ?? "Unknown",
           headline: p.bio ?? "",
-          skills: knownSkills.map((s: any) => ({ id: s.id, name: s.skill_name, level: "intermediate" as const })),
+          skills: known,
           matchScore: 0,
           reasons: [],
           explanation: "",
@@ -355,9 +401,10 @@ export const teamService = {
   },
 
   async add(projectId: string, candidateId: string): Promise<TeamMember[]> {
-    const { error } = await supabase
-      .from("team_members")
-      .upsert({ project_id: projectId, candidate_id: candidateId }, { onConflict: "project_id,candidate_id" });
+    const { error } = await supabase.from("team_members").upsert(
+      { project_id: projectId, candidate_id: candidateId },
+      { onConflict: "project_id,candidate_id" }
+    );
     if (error) throw toServiceError(error);
 
     const rows = await teamService.list(projectId);
