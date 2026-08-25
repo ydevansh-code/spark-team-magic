@@ -14,6 +14,7 @@ import { CurrentTeam } from "@/components/pm/current-team";
 import { MatchCard } from "@/components/pm/match-card";
 import { ProfileEditModal } from "@/components/pm/profile-modal";
 import { EmptyState, ErrorState, MatchListSkeleton } from "@/components/pm/states";
+import { TeamAdvisorChat } from "@/components/pm/team-advisor-chat";
 import {
   errorMessage,
   matchService,
@@ -394,6 +395,11 @@ function Workspace() {
           setReassembleOpen(false);
           assembleM.mutate();
         }}
+      />
+
+      <TeamAdvisorChat
+        project={project}
+        currentTeamSkills={(teamQ.data ?? []).map((e) => e.candidate.skills.map((s) => s.name))}
       />
     </div>
   );
